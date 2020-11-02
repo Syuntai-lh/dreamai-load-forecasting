@@ -1,3 +1,5 @@
 kn-baseline.py
 util_kn.py
 etc
+.idea
+__pycache__
