@@ -4,6 +4,7 @@ from util import *
 import datetime
 from sklearn.model_selection import train_test_split
 import lightgbm as lgb
+import datetime
 
 seed = 777
 window = 24
@@ -16,7 +17,8 @@ train = train.iloc[13:,:]
 ## index: datetime
 train.index = pd.to_datetime(train['Time'])
 test_time = pd.to_datetime(test['Time'])
-test.index = pd.to_datetime(test['Time'])
+
+test.index = test_time
 train.drop(columns=['Time'], inplace=True)
 test.drop(columns=['Time'], inplace=True)
 
@@ -41,79 +43,80 @@ def load_calendar(start_date,end_date):
 start_date, end_date = test.index[0],test.index[-1]
 calendar = load_calendar(start_date, end_date)  # 1-nw, 0-w
 
-#%% preprocessing
-## NaN processing
-train[train == 0] = np.nan
-test[test == 0] = np.nan
-
-# 일단 대충..
-def interp(df, window = 2):
-    for col in range(df.shape[1]):
-        home = np.reshape(df.iloc[:,col].values,(-1,24))
-        for row in range(home.shape[0]):
-            nan_idx = np.isnan(home[row, :])
-            # daytype = calendar[row].values
-            if row < window:
-                home[row, nan_idx] = np.nanmean(home[row:row + window + 1, nan_idx])
-            elif row > home.shape[0]-window-1:
-                home[row, nan_idx] = np.nanmean(home[row-window:row+1,nan_idx])
-            else:
-                home[row, nan_idx] = np.nanmean(home[row-window:row+window+1,nan_idx])
-        df.iloc[:,col] = np.ravel(home)
-    return df
-
-test = interp(test)
-# train = interp(train)
+## Replace NaN with 0
+train[pd.isnull(train)] = 0.
+test[pd.isnull(test)] = 0.
 
 #%% 24시간 예측
-def normalize(data):
-    data = data / np.max(data)
-    data = np.log(data)
-    mean_ = np.mean(data)
-    std_ = np.std(data)
-    norm = (data - mean_) / std_
-    return norm, mean_, std_
+def interp(datas):
+    for i, data in enumerate(datas):
+        if data == 0.:
+            if i < 2:
+                datas[i] = datas[i - 1]
+            else:
+                datas[i] = 0.2 * datas[i - 2] + 0.8 * datas[i - 1]
+    return datas
 
 
-def trans(data, time, window=24):
-    data_t = []
-    label = np.zeros((data.shape[0] - window - window, window))
-    for i in range(window, data.shape[0] - window):
-        data_s = np.array(data[i - window : i])
-        data_t.append(data_s)
-    # save test data
-    test_data = np.array(data[data.shape[0] - window: ]).reshape(1,-1)
-    data_t = np.array(data_t)
-    for j, i in enumerate(range(window, data.shape[0] - window)):
-        label[j,:] = np.array(data[i:i + window])
-
-    # add time feature
-    time_features = []
-    time_s = time.iloc[:-48]
-    time_features.append(time_s.dt.dayofweek)
-    time_features.append(time_s.dt.quarter)
-    time_features.append(time_s.dt.month)
-    time_features.append(time_s.dt.year)
-    time_features.append(time_s.dt.dayofyear)
-    time_features.append(time_s.dt.day)
-    time_features.append(time_s.dt.weekofyear)
-    time_features = np.array(time_features).T
-    data_t = np.concatenate([data_t,time_features], axis=1)
-
-    # add time for test
-    time_features = []
-    time_s = time.iloc[-24]
-    time_features.append(time_s.dayofweek)
-    time_features.append(time_s.quarter)
-    time_features.append(time_s.month)
-    time_features.append(time_s.year)
-    time_features.append(time_s.dayofyear)
-    time_features.append(time_s.day)
-    time_features.append(time_s.weekofyear)
-    time_features = np.array(time_features).T
-    time_features = time_features.reshape(1,-1)
-    test_data = np.concatenate([test_data,time_features], axis=1)
-    return data_t, label, test_data
+def trans(data, time, cal, is_train = True, window=24):
+    if is_train:
+        data_t = []
+        time_t = []
+        for i in range(window, data.shape[0] - window, window):
+            data_s = np.array(data[i - window : i])
+            data_t.append(data_s)
+            import datetime as dt
+            time_s = time.iloc[i - window]
+            cal_s = cal.values[int((i - window)/window)]
+            time_features = []
+            # encoding time
+            dt = time_s.date() - datetime.date(2018, 8, 1)
+            dt = dt.days
+            time_features.append(np.cos(2 * np.pi * dt / 365))
+            # additional features
+            time_features.append(time_s.dayofweek)
+            time_features.append(time_s.quarter)
+            time_features.append(time_s.month)
+            time_features.append(time_s.year)
+            time_features.append(time_s.dayofyear)
+            time_features.append(time_s.day)
+            time_features.append(time_s.weekofyear)
+            time_features.append(cal_s)
+            # append all the time features
+            time_features = np.array(time_features)
+            time_t.append(time_features)
+        data_t = np.array(data_t)
+        time_t = np.array(time_t)
+        label = np.zeros(data_t.shape)
+        # make label
+        for j, i in enumerate(range(window, data.shape[0] - window, window)):
+            label[j,:] = np.array(data[i:i + window])
+    else: # for test period
+        label = None
+        data_t = np.array(data[- window:])
+        time_s = time.iloc[-window]
+        cal_s = cal.values[-1]
+        # encoding time
+        time_features = []
+        dt = time_s.date() - datetime.date(2018, 8, 1)
+        dt = dt.days
+        time_features.append(np.cos(2 * np.pi * dt / 365))
+        # additional features
+        time_features.append(time_s.dayofweek)
+        time_features.append(time_s.quarter)
+        time_features.append(time_s.month)
+        time_features.append(time_s.year)
+        time_features.append(time_s.dayofyear)
+        time_features.append(time_s.day)
+        time_features.append(time_s.weekofyear)
+        time_features.append(cal_s)
+        # append all the time features
+        time_t = np.array(time_features)
+        data_t = data_t.reshape(1,-1)
+        time_t = time_t.reshape(1, -1)
+    # concatenate power and time features
+    data_t = np.concatenate([data_t,time_t], axis=1)
+    return data_t, label
 
 
 def smape_lgb(y_pred, train_data):
@@ -126,27 +129,34 @@ def smape_lgb(y_pred, train_data):
 cols = test.columns
 val_results = np.zeros((cols.shape[0], 24))
 models = dict(keys=cols)
+
 for i, col in enumerate(cols):
     home = test[col].values
     time = test_time.copy()
+    cal = calendar.copy()
 
     # drop NaN
-    first_non_nan_idx = np.where(~np.isnan(home))[0][0]
+    first_non_nan_idx = np.where(home != 0.)[0][0]
     home = home[first_non_nan_idx:]
     time = time[first_non_nan_idx:]
     cut = home.shape[0] % 24
     home = home[cut:]
     time = time[cut:]
+    cal = cal[-int(home.shape[0] / 24):]
+
+    # interpolation
+    home = interp(home)
 
     # transformation
-    data, label, _ = trans(home, time, window=window)
+    data, label = trans(home, time, cal, is_train = True, window=window)
     x_train, x_valid, y_train, y_valid = train_test_split(data, label, test_size=0.2, random_state=seed)
 
     # Train model
-    models_24 = []
+    models_w = []
     for h in range(window):
         lgb_train = lgb.Dataset(x_train, label=y_train[:,h])
         lgb_valid = lgb.Dataset(x_valid, label=y_valid[:,h])
+        """
         params = {
             'random_seed': seed,
             'bagging_seed': seed,
@@ -166,7 +176,18 @@ for i, col in enumerate(cols):
             'verbosity':-1,
             'n_jobs': -1
         }
-
+        """
+        params = {
+            'random_seed': seed,
+            'bagging_seed': seed,
+            'feature_fraction_seed': seed,
+            'data_random_seed': seed,
+            'drop_seed': seed,
+            'boosting_type': 'gbdt',
+            'objective': 'huber',
+            'verbosity': -1,
+            'n_jobs': -1
+        }
         model = lgb.train(
         params,
         lgb_train,
@@ -178,19 +199,37 @@ for i, col in enumerate(cols):
         feval=smape_lgb
         )
         val_result = model.best_score['valid_0']['smape_lgb']
-        models_24.append(model)
+        models_w.append(model)
         val_results[i, h] = val_result
     print(f'For {col}, smape is {val_results[i,:].mean()}')
-    models[col] = models_24
+    models[col] = models_w
 
-# test 예측
+
+#%% 24시간 test 예측
 submission = pd.read_csv('submit/submission.csv')
 submission.index = submission['meter_id']
 submission.drop(columns=['meter_id'], inplace=True)
 for col in cols:
-    _, _, test_data = trans(home, time, window=window)
     for h in range(window):
-        submission.loc[col,'X2018_7_1_'+str(h+1)+'h'] = models[col][h].predict(test_data)
+        home = test[col].values
+        time = test_time.copy()
+        cal = calendar.copy()
+
+        # drop NaN
+        first_non_nan_idx = np.where(home != 0.)[0][0]
+        home = home[first_non_nan_idx:]
+        time = time[first_non_nan_idx:]
+        cut = home.shape[0] % 24
+        home = home[cut:]
+        time = time[cut:]
+        cal = cal[-int(home.shape[0] / 24):]
+
+        # interpolation
+        home = interp(home)
+
+        test_data, _ = trans(home, time, cal, is_train=False, window=window)
+        test_pred = models[col][h].predict(test_data)
+        submission.loc[col, 'X2018_7_1_' + str(h + 1) + 'h'] = test_pred
 
 #%% 일별 및 월별 예측
 def AR_day_set(data,time):
@@ -308,10 +347,12 @@ for col in cols:
     submission.loc[col, 'X2018_11_m'] = pred_11m  # 11월
 
 #%% 제출
-submission.to_csv('submit/submit_4.csv', index=True)
+submission.to_csv('submit/submit_7.csv', index=True)
 
 #%% 확인
 a = pd.read_csv('submit/submit_2.csv')
-b = pd.read_csv('submit/submit_4.csv')
+b = pd.read_csv('submit/submit_7.csv')
 
 smape(b.iloc[:,1:24].values, a.iloc[:,1:24].values)
+smape(b.iloc[:,25:].values, a.iloc[:,25:].values)
+smape(b.iloc[:,1:].values, a.iloc[:,1:].values)

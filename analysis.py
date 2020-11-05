@@ -25,7 +25,7 @@ test = preprocessing(test)
 train = train.iloc[13:,:]
 
 #%%
-df = train.iloc[9600:,:]
+df = test
 null_tr = (~pd.isnull(df)).sum(axis=0)
 plt.plot(np.sort(null_tr))
 plt.xticks()
@@ -39,6 +39,10 @@ plt.xticks(null_tr.index[::2000], rotation=30)
 plt.title('시간 별 값이 있는 가구 수')
 plt.xlabel('Time')
 plt.show()
+
+#%%
+null_tr.index[(null_tr > 7000)]
+
 
 #%% accumulation 비율
 def find_avg(start_i, end_i, avg):
