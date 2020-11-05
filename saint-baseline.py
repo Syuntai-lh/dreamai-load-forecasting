@@ -1,28 +1,23 @@
 import pandas as pd  # 데이터 전처리
 import numpy as np  # 데이터 전처리
 import os
-from sklearn.ensemble import RandomForestRegressor
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
 from util_saint import *
+from tqdm import tqdm
 
 #%%
 test = pd.read_csv('data/test.csv')
 submission = pd.read_csv('submit/submission.csv')
-os.chdir('..')  # Changing Dir. (<main folder>)
+# os.chdir('..')  # Changing Dir. (<main folder>)
 
 test['Time'] = pd.to_datetime(test.Time)
 test = test.set_index('Time')
 
 print('Section [1]: Loading data...............')
 
-
-agg = {}
 comp_smape = []
 key_idx = 0
-
-for key in test.columns:
+agg = {}
+for key in tqdm(test.columns):
     key_idx = key_idx + 1
     print([key, key_idx])
     prev_type = 2  # 전날 요일 타입
@@ -34,10 +29,23 @@ for key in test.columns:
     # [시간 예측을 위한 마지막 24pnt 추출]
     # NaN 값처리를 위해서 마지막 40pnts 추출 한 후에
     # interpolation하고 나서 24pnts 재추출
+    """
     temp_test = test[key].iloc[8759 - 40:]
     temp_test = temp_test.interpolate(method='spline', order=2)
-
     temp_test = np.array(temp_test.values)
+    """
+    temp_test = test[key]
+    temp_test[pd.isnull(temp_test)] = 0
+    index_i, index_f = np.where(temp_test.values >0.0)[0][0], np.where(temp_test.values > 0.0)[0][-1]
+    temp_test = temp_test.iloc[index_i:index_f + 1].values
+
+    for i, data in enumerate(temp_test):
+        if data == 0.0:
+            if i < 2:
+                temp_test[i] = temp_test[i - 1]
+            else:
+                temp_test[i] = 0.2 * temp_test[i - 2] + 0.8 * temp_test[i - 1]
+
     temp_test = temp_test[len(temp_test) - 24:len(temp_test) + 1]
     subm_24hrs = temp_test
 
@@ -107,12 +115,15 @@ for key in test.columns:
 
     del nan_chk, lin_sampe, fcst_temp, pred_hyb, prev_smape, temp_idx
 
+    # Lightgbm model
+    lgb_fcst, lgb_smape = light_gbm_learn_gen(trainAR, testAR, subm_24hrs)
+
     # DNN model
     EPOCHS = 80
     Non_NNmodel, non_smape = non_linear_model_gen(trainAR, testAR, EPOCHS)
 
     # random forest model
-    mac_fcst, Mac_smape, smape_listss = machine_learn_gen(trainAR, testAR, subm_24hrs)
+    mac_fcst, Mac_smape = machine_learn_gen(trainAR, testAR, subm_24hrs)
 
     # linear model
     lin_sampe, fcst_temp, pred_hyb = linear_prediction(trainAR, testAR, fchk, subm_24hrs)
@@ -148,7 +159,7 @@ for key in test.columns:
                 minor_idx = minor_idx + 1
 
     # SMAPE가 DNN model이 가장 작으면, 해당 결과 사용
-    if (non_smape < lin_sampe) & (non_smape < Mac_smape) & (non_smape < sim_smape):
+    if (non_smape < lin_sampe) & (non_smape < Mac_smape) & (non_smape < sim_smape) & (non_smape < lgb_smape):
         temp_24hrs = np.zeros([1, 24])
         for qq in range(0, 24):
             temp_24hrs[0, qq] = subm_24hrs[qq]
@@ -156,18 +167,22 @@ for key in test.columns:
         fcst = Non_NNmodel.predict(temp_24hrs)
 
     # SMAPE가 random forest model이 가장 작으면, 해당 결과 사용
-    if (Mac_smape < non_smape) & (Mac_smape < lin_sampe) & (Mac_smape < sim_smape):
+    if (Mac_smape < non_smape) & (Mac_smape < lin_sampe) & (Mac_smape < sim_smape) & (Mac_smape < lgb_smape):
+        fcst = mac_fcst
+
+    # SMAPE가 lgbm model이 가장 작으면, 해당 결과 사용
+    if (lgb_smape < non_smape) & (lgb_smape < lin_sampe) & (lgb_smape < sim_smape) & (lgb_smape < Mac_smape):
         fcst = mac_fcst
 
     # SMAPE가 Similar day approach model이 가장 작으면, 해당 결과 사용
-    if (sim_smape < non_smape) & (sim_smape < lin_sampe) & (sim_smape < Mac_smape):
+    if (sim_smape < non_smape) & (sim_smape < lin_sampe) & (sim_smape < Mac_smape) & (sim_smape < lgb_smape):
         fcst = fcst_sim
 
     if (minor_idx > 0):
         fcst = fcst_sim
 
     # 각 SMAPE 결과 값을 정
-    comp_smape.append([non_smape, lin_sampe, Mac_smape, sim_smape])
+    comp_smape.append([non_smape, lin_sampe, Mac_smape, sim_smape ,lgb_smape])
 
     a = pd.DataFrame()  # a라는 데이터프레임에 예측값을 정리합니다.
 
@@ -175,8 +190,12 @@ for key in test.columns:
     for i in range(24):
         a['X2018_7_1_' + str(i + 1) + 'h'] = [fcst[0][i]]  # column명을 submission 형태에 맞게 지정합니다.
 
+    if key_idx == 2:
+        break
+
 #%%
-models = ['non','lin','Mac','sim']
+comp_smape = np.array(comp_smape)
+models = ['non','lin','Mac','sim','lgb']
 result = pd.DataFrame(index = test.columns, data = comp_smape,columns=models)
 null_tr = (~pd.isnull(test)).sum(axis=0)
 tmp = np.argmin(result.values, axis=1)
@@ -184,4 +203,4 @@ result['min_smape'] = np.nanmin(result.values, axis=1)
 result['selected_model'] = [models[t] for t in tmp]
 result['Null_points'] = null_tr.values
 result = result.sort_values(by=['Null_points'])
-result.to_csv('saint_result.csv',index=True)
+result.to_csv('saint_result_2.csv',index=True)

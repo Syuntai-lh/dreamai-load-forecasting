@@ -156,7 +156,7 @@ for i, col in enumerate(cols):
     for h in range(window):
         lgb_train = lgb.Dataset(x_train, label=y_train[:,h])
         lgb_valid = lgb.Dataset(x_valid, label=y_valid[:,h])
-        """
+
         params = {
             'random_seed': seed,
             'bagging_seed': seed,
@@ -188,6 +188,7 @@ for i, col in enumerate(cols):
             'verbosity': -1,
             'n_jobs': -1
         }
+        """
         model = lgb.train(
         params,
         lgb_train,

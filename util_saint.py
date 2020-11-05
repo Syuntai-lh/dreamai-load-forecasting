@@ -5,6 +5,8 @@ from sklearn.ensemble import RandomForestRegressor
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+import lightgbm as lgb
+from sklearn.multioutput import MultiOutputRegressor
 
 def smape(A, F):
     return 100 / len(A) * np.sum(2 * np.abs(F - A) / (np.abs(A) + np.abs(F)))
@@ -262,7 +264,108 @@ def machine_learn_gen(trainAR, testAR, x_24hrs):
     avr_smape = np.mean(smape_list)
     ypr = regr.predict(x_24hrs)
 
-    return ypr, avr_smape, smape_list
+    return ypr, avr_smape
+
+def light_gbm_learn_gen(trainAR, testAR, x_24hrs):
+    Dnum = trainAR.shape[0]
+    lnum = trainAR.shape[1]
+    smape_list = np.zeros([Dnum, 1])
+
+    def smape_lgb(y_pred, train_data):
+        y_true = train_data.get_label()
+        v = 2 * abs(y_pred - y_true) / (abs(y_pred) + abs(y_true))
+        output = np.mean(v) * 100
+        return 'smape_lgb', output, False
+
+    for ii in range(0, Dnum):  # cross validation
+        trainAR_temp = np.delete(trainAR, ii, axis=0)
+        testAR_temp = np.delete(testAR, ii, axis=0)
+
+        # lightgbm model 생성
+        """
+        lgb_params = {
+            'boosting_type':'gbdt',
+            'objective':'regression',
+            'early_stopping':50,
+            'num_iteration':10000,
+            'num_leaves':31,
+            'is_enable_sparse':'true',
+            'tree_learner':'data',
+            'min_data_in_leaf':600,
+            'max_depth':4, 
+            'learning_rate':0.1, 
+            'n_estimators':675, 
+            'max_bin':255, 
+            'subsample_for_bin':50000, 
+            'min_split_gain':5, 
+            'min_child_weight':5, 
+            'min_child_samples':10, 
+            'subsample':0.995, 
+            'subsample_freq':1, 
+            'colsample_bytree':1, 
+            'reg_alpha':0, 
+            'reg_lambda':0, 
+            'seed':0, 
+            'nthread':-1, 
+            'silent':True,
+        }
+        """
+        seed = 777
+        params = {
+            'random_seed': seed,
+            'bagging_seed': seed,
+            'feature_fraction_seed': seed,
+            'data_random_seed': seed,
+            'drop_seed': seed,
+            'boosting_type': 'gbdt',
+            'objective': 'huber',
+            'verbosity': -1,
+            'n_jobs': -1,
+        }
+        x_temp = np.zeros([1, lnum])
+        for kk in range(0, lnum):
+            x_temp[0, kk] = trainAR[ii, kk]
+
+        yre = np.zeros([1, lnum])
+        for kk in range(0, lnum):
+            yre[0, kk] = testAR[ii, kk]
+
+        results_24 = np.zeros(24)
+        ypr = np.zeros(24)
+        for h in range(24):
+            lgb_train = lgb.Dataset(trainAR_temp, label=testAR_temp[:, h])
+            lgb_valid = lgb.Dataset(x_temp, label=yre[:, h])
+            model = lgb.train(
+                params,
+                lgb_train,
+                valid_sets=lgb_valid,
+                num_boost_round=500,
+                early_stopping_rounds=50,
+                verbose_eval=-1,
+                feature_name=None,
+                feval=smape_lgb
+            )
+            ypr[h] = model.predict(x_temp)
+
+        smape_list[ii] = smape(ypr, yre)
+
+    # fit and predict
+    x_24hrs = np.reshape(x_24hrs, (-1, lnum))
+    ypr = np.zeros(24)
+    for h in range(24):
+        lgb_train = lgb.Dataset(trainAR, label=testAR[:, h])
+        model = lgb.train(
+            params,
+            lgb_train,
+            num_boost_round=500,
+            verbose_eval=-1,
+            feature_name=None,
+            feval=smape_lgb
+        )
+        ypr[h] = model.predict(x_24hrs)
+    avr_smape = np.mean(smape_list)
+
+    return ypr, avr_smape
 
 def non_linear_model_gen(trainAR, testAR, EPOCHS):
     numData = np.size(trainAR, 0)
