@@ -18,6 +18,7 @@ comp_smape = []
 key_idx = 0
 agg = {}
 for key in tqdm(test.columns):
+    key = test.columns[13]
     key_idx = key_idx + 1
     print([key, key_idx])
     prev_type = 2  # 전날 요일 타입
@@ -29,14 +30,10 @@ for key in tqdm(test.columns):
     # [시간 예측을 위한 마지막 24pnt 추출]
     # NaN 값처리를 위해서 마지막 40pnts 추출 한 후에
     # interpolation하고 나서 24pnts 재추출
-    """
-    temp_test = test[key].iloc[8759 - 40:]
-    """
     temp_test = test[key]
-    temp_test[pd.isnull(temp_test)] = 0
-    index_i, index_f = np.where(temp_test.values >0.0)[0][0], np.where(temp_test.values > 0.0)[0][-1]
-    temp_test = temp_test.iloc[index_i:index_f + 1]
+    temp_test = test[key].iloc[8759 - 40:]
     temp_test = temp_test.interpolate(method='spline', order=2)
+
     temp_test = np.array(temp_test.values)
     temp_test = temp_test[len(temp_test) - 24:len(temp_test) + 1]
     subm_24hrs = temp_test
@@ -203,17 +200,16 @@ for key in tqdm(test.columns):
     print('Section [4]: Hour prediction model...............')
     for i in range(24):
         a['X2018_7_1_' + str(i + 1) + 'h'] = [fcst[0][i]]  # column명을 submission 형태에 맞게 지정합니다.
-    break
 
 
 #%%
 comp_smape = np.array(comp_smape)
 models = ['non','lin','Mac','sim','lgb','svr','cat', 'dct',' extra', 'lstm']
-result = pd.DataFrame(index = test.columns, data = comp_smape,columns=models)
-null_tr = (~pd.isnull(test)).sum(axis=0)
+result = pd.DataFrame(index = test.columns[:139], data = comp_smape,columns=models)
+# null_tr = (~pd.isnull(test)).sum(axis=0)
 tmp = np.argmin(result.values, axis=1)
 result['min_smape'] = np.nanmin(result.values, axis=1)
 result['selected_model'] = [models[t] for t in tmp]
-result['Null_points'] = null_tr.values
-result = result.sort_values(by=['Null_points'])
-# result.to_csv('saint_result_2.csv',index=True)
+# result['Null_points'] = null_tr.values
+# result = result.sort_values(by=['Null_points'])
+result.to_csv('saint_result_3.csv',index=True)

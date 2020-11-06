@@ -164,3 +164,11 @@ print('===Done===')
 plt.xlabel('Length of nan')
 plt.ylabel('Before NaN')
 plt.show()
+
+#%%
+models = ['non','lin','Mac','sim','lgb','svr','cat', 'dct',' extra', 'lstm']
+result = pd.read_csv('result/saint_result.csv')
+tmp = np.argmin(result.iloc[:,1:11].values,axis=1)
+result['min_smape'] = np.nanmin(result.iloc[:,1:11].values, axis=1)
+result['selected_model'] = [models[t] for t in tmp]
+result.to_csv('saint_result.csv', index=False)

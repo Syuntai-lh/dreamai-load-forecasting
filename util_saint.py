@@ -247,7 +247,7 @@ def machine_learn_gen(trainAR, testAR, x_24hrs):
         testAR_temp = np.delete(testAR, ii, axis=0)
 
         # mae 기반의 loss를 이용한 randomforest model 생성
-        regr = RandomForestRegressor(max_depth=3, random_state=0, n_estimators=100, criterion='mae')
+        regr = RandomForestRegressor(max_depth=5, random_state=0, n_estimators=100, criterion='mae')
         regr.fit(trainAR_temp, testAR_temp)
 
         x_temp = np.zeros([1, lnum])
@@ -601,20 +601,14 @@ def lstm_gen(trainAR, testAR, EPOCHS):
 
         ])
 
-        optimizer = tf.keras.optimizers.Adam(0.01)
+        optimizer = tf.keras.optimizers.Adam(0.001)
 
         model.compile(loss='mae',
                       optimizer=optimizer,
                       metrics=['mae', 'mse'])
         return model
 
-    def scheduler(epoch, lr):
-        if epoch < 10:
-            return 0.01
-        else:
-            return 0.9 * lr
 
-    lr = LearningRateScheduler(scheduler)
     model = build_model()
     es = EarlyStopping(
         monitor='val_loss',
@@ -626,7 +620,7 @@ def lstm_gen(trainAR, testAR, EPOCHS):
         restore_best_weights=True
     )
     history = model.fit(
-        train_data,epochs=EPOCHS, verbose=0, validation_data=val_data,callbacks = [lr, es])
+        train_data,epochs=EPOCHS, verbose=0, validation_data=val_data,callbacks = [es])
 
     hist = pd.DataFrame(history.history)
     hist['epoch'] = history.epoch
