@@ -8,6 +8,8 @@ try:
 except BaseException:
     import pickle
 
+save_dir = 'val_results/1107_'
+
 #%%
 test = pd.read_csv('data/test.csv')
 submission = pd.read_csv('submit/submission.csv')
@@ -162,54 +164,39 @@ for key in tqdm(test.columns):
     smape_results = [non_smape, lin_sampe, Mac_smape,
                      sim_smape ,svr_smape, dct_smape, extra_smape, lstm_smape]
 
-    if np.argmin(smape_results) == 0:
-        temp_24hrs = np.zeros([1, 24])
-        for qq in range(0, 24):
-            temp_24hrs[0, qq] = subm_24hrs[qq]
-        fcst = Non_NNmodel.predict(temp_24hrs)
-    elif np.argmin(smape_results) == 1:
-        fcst = np.zeros([1, 24])
-        for qq in range(0, 24):
-            fcst[0, qq] = fcst_temp[qq]
-            if fcst_temp[qq] < 0:
-                minor_idx = minor_idx + 1
-    elif np.argmin(smape_results) == 2:
-        fcst = mac_fcst
-    elif np.argmin(smape_results) == 3:
-        fcst = sim_fcst
-    elif np.argmin(smape_results) == 4:
-        fcst = svr_fcst
-    elif np.argmin(smape_results) == 5:
-        fcst = dct_fcst
-    elif np.argmin(smape_results) == 6:
-        fcst = extra_fcst
-    elif np.argmin(smape_results) == 7:
-        temp_24hrs = np.zeros([1, 24])
-        for qq in range(0, 24):
-            temp_24hrs[0, qq] = subm_24hrs[qq]
-        fcst = lstm_model.predict(temp_24hrs)
-
-    if (minor_idx > 0):
-        fcst = sim_fcst
+    test_pred = pd.DataFrame()
+    ## DNN
+    temp_24hrs = np.zeros([1, 24])
+    for qq in range(0, 24):
+        temp_24hrs[0, qq] = subm_24hrs[qq]
+    dnn_fcst = Non_NNmodel.predict(temp_24hrs)
+    test_pred['dnn'] = np.ravel(dnn_fcst)
+    ## AR
+    fcst = fcst_temp[qq]
+    test_pred['AR'] = np.ravel(fcst)
+    ## RF
+    test_pred['RF'] = np.ravel(mac_fcst)
+    ## Sim
+    test_pred['sim'] = np.ravel(sim_fcst)
+    ## svr
+    test_pred['svr'] = np.ravel(svr_fcst)
+    ## extra
+    test_pred['extra'] = np.ravel(extra_fcst)
+    ## lstm
+    temp_24hrs = np.zeros([1, 24])
+    for qq in range(0, 24):
+        temp_24hrs[0, qq] = subm_24hrs[qq]
+    lstm_fcst = lstm_model.predict(temp_24hrs)
+    test_pred['lstm'] = np.ravel(lstm_fcst)
 
     # 각 SMAPE 결과 값을 정
     comp_smape.append(smape_results)
+    comp_smape = np.array(comp_smape)
+    models = ['non', 'lin', 'Mac', 'sim', 'svr', ' extra', 'lstm']
+    smape_result = pd.DataFrame(index=test.columns, data=comp_smape, columns=models)
 
-    a = pd.DataFrame()  # a라는 데이터프레임에 예측값을 정리합니다.
-
-    print('Section [4]: Hour prediction model...............')
-    for i in range(24):
-        a['X2018_7_1_' + str(i + 1) + 'h'] = [fcst[0][i]]  # column명을 submission 형태에 맞게 지정합니다.
-
-
-#%%
-comp_smape = np.array(comp_smape)
-models = ['non','lin','Mac','sim','svr','dct',' extra', 'lstm']
-result = pd.DataFrame(index = test.columns[:139], data = comp_smape,columns=models)
-# null_tr = (~pd.isnull(test)).sum(axis=0)
-tmp = np.argmin(result.values, axis=1)
-result['min_smape'] = np.nanmin(result.values, axis=1)
-result['selected_model'] = [models[t] for t in tmp]
-# val_results['Null_points'] = null_tr.values
-# val_results = val_results.sort_values(by=['Null_points'])
-result.to_csv('saint_result_3.csv',index=True)
+    if save_dir == None:
+        pass
+    else:
+        test_pred.to_csv(save_dir+'pred_result.csv', index=True)
+        smape_result.to_csv(save_dir+'smape_result.csv', index=True)
