@@ -273,7 +273,7 @@ def AR_day_set(data,time):
     return temp_day
 
 for col in cols:
-    fcst_d = np.zeros([1, 10])  # pre-allocation of the result data
+    fcst_d = np.zeros([1, 10])  # pre-allocation of the val_results data
     home = test[col].values
     time = test_time.copy()
 

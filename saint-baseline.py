@@ -3,6 +3,10 @@ import numpy as np  # 데이터 전처리
 import os
 from util_saint import *
 from tqdm import tqdm
+try:
+    import cPickle as pickle
+except BaseException:
+    import pickle
 
 #%%
 test = pd.read_csv('data/test.csv')
@@ -15,12 +19,8 @@ test = test.set_index('Time')
 print('Section [1]: Loading data...............')
 
 comp_smape = []
-key_idx = 0
 agg = {}
 for key in tqdm(test.columns):
-    key = test.columns[13]
-    key_idx = key_idx + 1
-    print([key, key_idx])
     prev_type = 2  # 전날 요일 타입
     curr_type = 2  # 예측날 요일 타입
     trainAR, testAR = AR_data_set(test, key, prev_type, curr_type)
@@ -103,9 +103,15 @@ for key in tqdm(test.columns):
 
     del nan_chk, lin_sampe, fcst_temp, pred_hyb, prev_smape, temp_idx
 
-    # Lightgbm model
-    # lgb_fcst, lgb_smape = light_gbm_learn_gen(trainAR, testAR, subm_24hrs)
-    lgb_fcst, lgb_smape = 1000, 1000
+    data_pr = [trainAR, testAR, subm_24hrs, fchk]
+    with open('data_pr/' + key + '.pkl', 'wb') as f:
+        pickle.dump(data_pr, f, pickle.HIGHEST_PROTOCOL)
+
+#%% model
+for key in tqdm(test.columns):
+    with open('data_pr/' + key + '.pkl', 'rb') as f:
+        data_pr = pickle.load(f)
+    trainAR, testAR, subm_24hrs, fchk = data_pr
 
     # DNN model
     EPOCHS = 80
@@ -116,10 +122,6 @@ for key in tqdm(test.columns):
 
     # svr model
     svr_fcst, svr_smape = svr_gen(trainAR, testAR, subm_24hrs)
-
-    # catboost
-    # cat_fcst, cat_smape = catboost_gen(trainAR, testAR, subm_24hrs)
-    cat_fcst, cat_smape = 1000, 1000
 
     # linear model
     lin_sampe, fcst_temp, pred_hyb = linear_prediction(trainAR, testAR, fchk, subm_24hrs)
@@ -155,8 +157,10 @@ for key in tqdm(test.columns):
     minor_idx = 0  # Autoregression model에서 minor value가 나타나면,
     # 모델을 Autoregression model에서 similar day appreach로 변경 진행.
 
+    ##### Model Selection #####
+
     smape_results = [non_smape, lin_sampe, Mac_smape,
-                     sim_smape ,lgb_smape, svr_smape, cat_smape, dct_smape, extra_smape, lstm_smape]
+                     sim_smape ,svr_smape, dct_smape, extra_smape, lstm_smape]
 
     if np.argmin(smape_results) == 0:
         temp_24hrs = np.zeros([1, 24])
@@ -174,16 +178,12 @@ for key in tqdm(test.columns):
     elif np.argmin(smape_results) == 3:
         fcst = sim_fcst
     elif np.argmin(smape_results) == 4:
-        fcst = lgb_fcst
-    elif np.argmin(smape_results) == 5:
         fcst = svr_fcst
-    elif np.argmin(smape_results) == 6:
-        fcst = cat_fcst
-    elif np.argmin(smape_results) == 7:
+    elif np.argmin(smape_results) == 5:
         fcst = dct_fcst
-    elif np.argmin(smape_results) == 8:
+    elif np.argmin(smape_results) == 6:
         fcst = extra_fcst
-    elif np.argmin(smape_results) == 9:
+    elif np.argmin(smape_results) == 7:
         temp_24hrs = np.zeros([1, 24])
         for qq in range(0, 24):
             temp_24hrs[0, qq] = subm_24hrs[qq]
@@ -204,12 +204,12 @@ for key in tqdm(test.columns):
 
 #%%
 comp_smape = np.array(comp_smape)
-models = ['non','lin','Mac','sim','lgb','svr','cat', 'dct',' extra', 'lstm']
+models = ['non','lin','Mac','sim','svr','dct',' extra', 'lstm']
 result = pd.DataFrame(index = test.columns[:139], data = comp_smape,columns=models)
 # null_tr = (~pd.isnull(test)).sum(axis=0)
 tmp = np.argmin(result.values, axis=1)
 result['min_smape'] = np.nanmin(result.values, axis=1)
 result['selected_model'] = [models[t] for t in tmp]
-# result['Null_points'] = null_tr.values
-# result = result.sort_values(by=['Null_points'])
+# val_results['Null_points'] = null_tr.values
+# val_results = val_results.sort_values(by=['Null_points'])
 result.to_csv('saint_result_3.csv',index=True)
