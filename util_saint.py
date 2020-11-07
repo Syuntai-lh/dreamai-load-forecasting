@@ -237,17 +237,24 @@ def similar_approach(trainAR, testAR, slen, sim_set):
 
     return simil_smape, simil_temp
 
-def machine_learn_gen(trainAR, testAR, x_24hrs):
+def machine_learn_gen(trainAR, testAR, x_24hrs, params=None):
     Dnum = trainAR.shape[0]
     lnum = trainAR.shape[1]
     smape_list = np.zeros([Dnum, 1])
+    if params == None:
+        params = {
+            'max_depth' : 5,
+            'random_state' : 0,
+            'n_estimators' : 100,
+            'criterion' : 'mae'
+        }
 
     for ii in range(0, Dnum):  # cross validation
         trainAR_temp = np.delete(trainAR, ii, axis=0)
         testAR_temp = np.delete(testAR, ii, axis=0)
 
         # mae 기반의 loss를 이용한 randomforest model 생성
-        regr = RandomForestRegressor(max_depth=5, random_state=0, n_estimators=100, criterion='mae')
+        regr = RandomForestRegressor(**params)
         regr.fit(trainAR_temp, testAR_temp)
 
         x_temp = np.zeros([1, lnum])
@@ -262,7 +269,7 @@ def machine_learn_gen(trainAR, testAR, x_24hrs):
 
         smape_list[ii] = smape(np.transpose(ypr), np.transpose(yre))
 
-    regr = RandomForestRegressor(max_depth=5, random_state=0, n_estimators=100, criterion='mae')
+    regr = RandomForestRegressor(**params)
     regr.fit(trainAR, testAR)
 
     x_24hrs = np.reshape(x_24hrs, (-1, lnum))
@@ -272,18 +279,18 @@ def machine_learn_gen(trainAR, testAR, x_24hrs):
 
     return ypr, avr_smape
 
-def svr_gen(trainAR, testAR, x_24hrs):
+def svr_gen(trainAR, testAR, x_24hrs, params = None):
     Dnum = trainAR.shape[0]
     lnum = trainAR.shape[1]
     smape_list = np.zeros([Dnum, 1])
-
+    if params == None:
+        params = {
+            'kernel': 'rbf',
+        }
     for ii in range(0, Dnum):  # cross validation
         trainAR_temp = np.delete(trainAR, ii, axis=0)
         testAR_temp = np.delete(testAR, ii, axis=0)
 
-        params = {
-            'kernel': 'rbf',
-        }
         # mae 기반의 loss를 이용한 randomforest model 생성
         regr = MultiOutputRegressor(SVR(**params))
         regr.fit(trainAR_temp, testAR_temp)
@@ -345,16 +352,19 @@ def catboost_gen(trainAR, testAR, x_24hrs):
 
     return ypr, avr_smape
 
-def dct_gen(trainAR, testAR, x_24hrs):
+def dct_gen(trainAR, testAR, x_24hrs, params = None):
     Dnum = trainAR.shape[0]
     lnum = trainAR.shape[1]
     smape_list = np.zeros([Dnum, 1])
-
+    if params == None:
+        params = {
+           'random_state' : 0,
+        }
     for ii in range(0, Dnum):  # cross validation
         trainAR_temp = np.delete(trainAR, ii, axis=0)
         testAR_temp = np.delete(testAR, ii, axis=0)
 
-        regr = DecisionTreeRegressor(random_state=0)
+        regr = DecisionTreeRegressor(**params)
 
         regr.fit(trainAR_temp, testAR_temp)
         x_temp = np.zeros([1, lnum])
@@ -369,24 +379,28 @@ def dct_gen(trainAR, testAR, x_24hrs):
 
         smape_list[ii] = smape(np.transpose(ypr), np.transpose(yre))
 
-    regr = DecisionTreeRegressor(random_state=0)
+    regr = DecisionTreeRegressor(**params)
     regr.fit(trainAR, testAR)
     x_24hrs = np.reshape(x_24hrs, (-1, lnum))
     avr_smape = np.mean(smape_list)
     ypr = regr.predict(x_24hrs)
 
     return ypr, avr_smape
-def extra_gen(trainAR, testAR, x_24hrs):
+def extra_gen(trainAR, testAR, x_24hrs,  params = None):
     Dnum = trainAR.shape[0]
     lnum = trainAR.shape[1]
     smape_list = np.zeros([Dnum, 1])
-
+    if params == None:
+        params = {
+            'n_estimators' : 100,
+            'n_jobs' : -1,
+            'min_samples_split' : 25,
+        }
     for ii in range(0, Dnum):  # cross validation
         trainAR_temp = np.delete(trainAR, ii, axis=0)
         testAR_temp = np.delete(testAR, ii, axis=0)
 
-        regr = ExtraTreesRegressor(n_estimators=100, n_jobs=-1, min_samples_split=25,
-                                    min_samples_leaf=35)
+        regr = ExtraTreesRegressor(**params)
 
         regr.fit(trainAR_temp, testAR_temp)
         x_temp = np.zeros([1, lnum])
@@ -401,8 +415,7 @@ def extra_gen(trainAR, testAR, x_24hrs):
 
         smape_list[ii] = smape(np.transpose(ypr), np.transpose(yre))
 
-    regr = ExtraTreesRegressor(n_estimators=100, n_jobs=-1, min_samples_split=25,
-                               min_samples_leaf=35)
+    regr = ExtraTreesRegressor(**params)
     regr.fit(trainAR, testAR)
     x_24hrs = np.reshape(x_24hrs, (-1, lnum))
     avr_smape = np.mean(smape_list)
@@ -510,7 +523,16 @@ def light_gbm_learn_gen(trainAR, testAR, x_24hrs):
     avr_smape = np.mean(smape_list)
     return ypr, avr_smape
 
-def non_linear_model_gen(trainAR, testAR, EPOCHS):
+def non_linear_model_gen(trainAR, testAR, params):
+    if params == None:
+        params = {
+            'EPOCH': 80,
+            'h1': 128,
+            'h2': 256,
+            'h3': 128,
+            'lr':0.001
+        }
+
     numData = np.size(trainAR, 0)
     numTr = int(numData * 0.8)
     Xtr = trainAR[0:numTr - 1, :]
@@ -524,13 +546,13 @@ def non_linear_model_gen(trainAR, testAR, EPOCHS):
 
     def build_model():
         model = keras.Sequential([
-            layers.Dense(128, activation='relu', input_shape=(num_tr,)),
-            layers.Dense(256, activation='relu'),
-            layers.Dense(128, activation='relu'),
+            layers.Dense(params['h1'], activation='relu', input_shape=(num_tr,)),
+            layers.Dense(params['h2'], activation='relu'),
+            layers.Dense(params['h1'], activation='relu'),
             layers.Dense(num_te)
         ])
 
-        optimizer = tf.keras.optimizers.Adam(0.001)
+        optimizer = tf.keras.optimizers.Adam(params['lr'])
 
         model.compile(loss='mae',
                       optimizer=optimizer,
@@ -551,7 +573,7 @@ def non_linear_model_gen(trainAR, testAR, EPOCHS):
 
     history = model.fit(
         Xtr, Ytr,
-        epochs=EPOCHS, verbose=0,
+        epochs=params['EPOCH'], verbose=0,
         callbacks=[PrintDot()])
 
     hist = pd.DataFrame(history.history)
@@ -586,18 +608,20 @@ def lstm_gen(trainAR, testAR, EPOCHS):
     Ytr = Ytr.reshape(-1,num_tr)
     Yte = Yte.reshape(-1, num_te)
     train_data = tf.data.Dataset.from_tensor_slices((Xtr, Ytr))
-    train_data = train_data.shuffle(10, reshuffle_each_iteration=True)
-    train_data = train_data.batch(10)
+    train_data = train_data.shuffle(num_tr, reshuffle_each_iteration=True)
+    train_data = train_data.batch(num_tr)
     train_data = train_data.repeat(EPOCHS)
     val_data = tf.data.Dataset.from_tensor_slices((Xte, Yte))
-    val_data = val_data.batch(10).repeat(10)
+    # val_data = val_data.batch(10).repeat(10)
+    val_data = val_data.batch(num_te)
 
     def build_model():
         model = tf.keras.Sequential([
             tf.keras.layers.LSTM(24,
                                  return_sequences=False,
                                  input_shape=Xtr.shape[-2:],
-                                 kernel_initializer=keras.initializers.he_normal(), activation='relu')
+                                  activation='relu'),
+            layers.Dense(num_te, activation='relu')
 
         ])
 
@@ -613,14 +637,14 @@ def lstm_gen(trainAR, testAR, EPOCHS):
     es = EarlyStopping(
         monitor='val_loss',
         min_delta=0,
-        patience=10,
+        patience=30,
         verbose=0,
         mode='min',
         baseline=None,
         restore_best_weights=True
     )
     history = model.fit(
-        train_data,epochs=EPOCHS, verbose=0, validation_data=val_data,callbacks = [es])
+        train_data,epochs=EPOCHS, verbose=1, validation_data=val_data,callback=[es])
 
     hist = pd.DataFrame(history.history)
     hist['epoch'] = history.epoch
