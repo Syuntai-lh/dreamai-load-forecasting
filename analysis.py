@@ -172,3 +172,43 @@ tmp = np.argmin(result.iloc[:,1:11].values,axis=1)
 result['min_smape'] = np.nanmin(result.iloc[:,1:11].values, axis=1)
 result['selected_model'] = [models[t] for t in tmp]
 result.to_csv('saint_result.csv', index=False)
+
+#%%
+result = pd.read_csv('val_results/baseline_result.csv')
+result.index = result.iloc[:,0]
+result = result.iloc[:,1:10]
+result['selected'] = result.columns[np.argmin(result.values, axis=1)]
+model_rec = result['selected']
+model_rec.to_csv('model_recognition.csv',index=True)
+
+#%%
+import pandas as pd
+import pickle
+
+def load_obj(name):
+    with open('tune_results/' + name + '.pkl', 'rb') as f:
+        trials = pickle.load(f)
+        trials = sorted(trials, key=lambda k: k['loss'])
+        return trials
+
+baseline_val_result = pd.read_csv('val_results/baseline_result.csv')
+
+#%%
+for i in range(200):
+    a = load_obj(str(i)+'_svr')
+    b = baseline_val_result['min_smape'].values[i]
+    if a[0]['loss'] < b:
+        print(i)
+        print(a[0]['loss'])
+        print(b)
+
+#%%
+def smape(true, pred):
+    v = 2 * abs(pred - true) / (abs(pred) + abs(true))
+    output = np.mean(v) * 100
+    return output
+
+a = pd.read_csv('submit/submit_8.csv')
+b = pd.read_csv('submit/sub_baseline.csv')
+
+smape(a.iloc[:,25:].values, b.iloc[:,25:].values)

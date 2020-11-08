@@ -8,20 +8,19 @@ try:
 except BaseException:
     import pickle
 
-save_dir = 'val_results/1107_'
+# save_dir = 'val_results/1107_'
+save_dir = None
 
 #%%
+
 test = pd.read_csv('data/test.csv')
-submission = pd.read_csv('submit/submission.csv')
-# os.chdir('..')  # Changing Dir. (<main folder>)
+submission = pd.read_csv('submit/sub_baseline.csv')
 
 test['Time'] = pd.to_datetime(test.Time)
 test = test.set_index('Time')
 
 print('Section [1]: Loading data...............')
-
-comp_smape = []
-agg = {}
+"""
 for key in tqdm(test.columns):
     prev_type = 2  # 전날 요일 타입
     curr_type = 2  # 예측날 요일 타입
@@ -108,16 +107,15 @@ for key in tqdm(test.columns):
     data_pr = [trainAR, testAR, subm_24hrs, fchk]
     with open('data_pr/' + key + '.pkl', 'wb') as f:
         pickle.dump(data_pr, f, pickle.HIGHEST_PROTOCOL)
-
+"""
 #%% model
+comp_smape = []
 for key in tqdm(test.columns):
     with open('data_pr/' + key + '.pkl', 'rb') as f:
         data_pr = pickle.load(f)
     trainAR, testAR, subm_24hrs, fchk = data_pr
-
     # DNN model
-    EPOCHS = 80
-    Non_NNmodel, non_smape = non_linear_model_gen(trainAR, testAR, EPOCHS)
+    Non_NNmodel, non_smape = non_linear_model_gen(trainAR, testAR)
 
     # random forest model
     mac_fcst, Mac_smape = machine_learn_gen(trainAR, testAR, subm_24hrs)
@@ -135,8 +133,7 @@ for key in tqdm(test.columns):
     extra_fcst, extra_smape = extra_gen(trainAR, testAR, subm_24hrs)
 
     # LSTM model
-    EPOCHS = 80
-    lstm_model, lstm_smape = lstm_gen(trainAR, testAR, EPOCHS)
+    lstm_model, lstm_smape = lstm_gen(trainAR, testAR)
 
     # Similar day approach model
     temp_24hrs = np.zeros([1, 24])  # np.array type으로 변경.
@@ -170,33 +167,35 @@ for key in tqdm(test.columns):
     for qq in range(0, 24):
         temp_24hrs[0, qq] = subm_24hrs[qq]
     dnn_fcst = Non_NNmodel.predict(temp_24hrs)
-    test_pred['dnn'] = np.ravel(dnn_fcst)
+    test_pred[key+'_dnn'] = np.ravel(dnn_fcst)
     ## AR
-    fcst = fcst_temp[qq]
-    test_pred['AR'] = np.ravel(fcst)
+    fcst = fcst_temp
+    test_pred[key+'_AR'] = np.ravel(fcst)
     ## RF
-    test_pred['RF'] = np.ravel(mac_fcst)
+    test_pred[key+'_RF'] = np.ravel(mac_fcst)
     ## Sim
-    test_pred['sim'] = np.ravel(sim_fcst)
+    test_pred[key+'_sim'] = np.ravel(sim_fcst)
     ## svr
-    test_pred['svr'] = np.ravel(svr_fcst)
+    test_pred[key+'_svr'] = np.ravel(svr_fcst)
     ## extra
-    test_pred['extra'] = np.ravel(extra_fcst)
+    test_pred[key+'_extra'] = np.ravel(extra_fcst)
     ## lstm
     temp_24hrs = np.zeros([1, 24])
     for qq in range(0, 24):
         temp_24hrs[0, qq] = subm_24hrs[qq]
+    temp_24hrs = np.reshape(temp_24hrs, (-1,24,1))
     lstm_fcst = lstm_model.predict(temp_24hrs)
-    test_pred['lstm'] = np.ravel(lstm_fcst)
+    test_pred[key+'_lstm'] = np.ravel(lstm_fcst)
 
-    # 각 SMAPE 결과 값을 정
-    comp_smape.append(smape_results)
-    comp_smape = np.array(comp_smape)
-    models = ['non', 'lin', 'Mac', 'sim', 'svr', ' extra', 'lstm']
-    smape_result = pd.DataFrame(index=test.columns, data=comp_smape, columns=models)
 
-    if save_dir == None:
-        pass
-    else:
-        test_pred.to_csv(save_dir+'pred_result.csv', index=True)
-        smape_result.to_csv(save_dir+'smape_result.csv', index=True)
+# 각 SMAPE 결과 값을 정
+comp_smape.append(smape_results)
+comp_smape = np.array(comp_smape)
+models = ['non', 'lin', 'Mac', 'sim', 'svr', ' extra', 'lstm']
+smape_result = pd.DataFrame(index=test.columns, data=comp_smape, columns=models)
+
+if save_dir == None:
+    pass
+else:
+    test_pred.to_csv(save_dir+'pred_result.csv', index=True)
+    smape_result.to_csv(save_dir+'smape_result.csv', index=True)
