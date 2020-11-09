@@ -86,11 +86,10 @@ class Tuning_model(object):
 
     def dnn_space(self):
         self.space = {
-            'EPOCH':                    hp.quniform('EPOCH', 50, 100, 5),
+            'EPOCH':                    hp.quniform('EPOCH', 50, 200, 5),
             'h1':                       hp.quniform('h1', 24, 24*20, 24),
             'h2':                       hp.quniform('h2', 24, 24*20, 24),
-            'h3':                       hp.quniform('h3', 24, 24*20, 24),
-            'lr':                       hp.uniform('lr', 0.0001, 0.01),
+            'lr':                       hp.loguniform('lr',np.log(1e-4),np.log(1e-1))
             }
 
     # optimize
@@ -134,9 +133,9 @@ class Tuning_model(object):
         return {'loss': smape, 'params': params, 'status': STATUS_OK, 'method':args.method}
 
     def dnn_val(self, params, train_set):
-        params = make_param_int(params, ['EPOCH', 'h1', 'h2', 'h3'])
+        params = make_param_int(params, ['EPOCH', 'h1', 'h2'])
         trainAR, testAR = train_set
-        _, smape = non_linear_model_gen(trainAR, testAR, params)
+        _, smape = non_linear_model_gen_v3(trainAR, testAR, params)
         # Dictionary with information for evaluation
         return {'loss': smape, 'params': params, 'status': STATUS_OK, 'method':args.method}
 
@@ -147,7 +146,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tune each household...',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--method', default='dnn', choices=['rf', 'svr', 'dct','extra','dnn'])
-    parser.add_argument('--max_evals', default=1000, type=int)
+    parser.add_argument('--max_evals', default=3, type=int)
     parser.add_argument('--save_file', default='tmp')
     parser.add_argument('--col_idx', default=0, type=int)
     args = parser.parse_args()

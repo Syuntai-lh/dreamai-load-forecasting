@@ -194,21 +194,67 @@ def load_obj(name):
 baseline_val_result = pd.read_csv('val_results/baseline_result.csv')
 
 #%%
-for i in range(200):
-    a = load_obj(str(i)+'_svr')
-    b = baseline_val_result['min_smape'].values[i]
-    if a[0]['loss'] < b:
-        print(i)
-        print(a[0]['loss'])
-        print(b)
+for i in range(100):
+    a = load_obj(str(i)+'_dnn')
+    b = load_obj(str(i) + '_dnn_2')
+    print('Reference {:.2f}, {:.2f} and {:.2f}'.format(baseline_val_result['min_smape'][i], a[0]['loss'], b[0]['loss']))
 
 #%%
+import pandas as pd
+import numpy as np
 def smape(true, pred):
     v = 2 * abs(pred - true) / (abs(pred) + abs(true))
     output = np.mean(v) * 100
     return output
 
 a = pd.read_csv('submit/submit_8.csv')
-b = pd.read_csv('submit/sub_baseline.csv')
+b = pd.read_csv('submit/submit_10.csv')
+# b = pd.read_csv('submit/result_00.csv')
 
-smape(a.iloc[:,25:].values, b.iloc[:,25:].values)
+smape_val = []
+for i in range(200):
+    result_1 = smape(np.ravel(a.iloc[i,1:25].values), np.ravel(b.iloc[i,1:25].values))
+    smape_val.append(result_1)
+    print(result_1)
+print('====')
+print(np.mean(smape_val))
+
+
+#%%
+def save_obj(obj, name):
+    with open('tune_results/'+ name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+
+for i in range(200):
+    a_list = load_obj(str(i)+'_dnn_3')
+    for j in range(len(a_list)):
+        a_list[j]['method'] = 'dnn_3'
+    save_obj(a_list, str(i)+'_dnn_3')
+
+#%%
+from hyperopt import fmin, hp, tpe, Trials, space_eval
+from hyperopt.pyll import scope as ho_scope
+from hyperopt.pyll.stochastic import sample as ho_sample
+
+space = {
+            'EPOCH':                    hp.quniform('EPOCH', 10, 200, 5),
+            'h1':                       hp.quniform('h1', 24, 24*20, 24),
+            'h2':                       hp.choice('h2',
+                                                  [
+                                                      hp.quniform('h2', 24, 24 * 20, 24),
+                                                      0
+                                                  ]),
+            'h3':                       hp.choice('h3',
+                                                [
+                                                    hp.quniform('h3', 24, 24 * 20, 24),
+                                                    0
+                                                ]),
+            'h4':                       hp.choice('h4',
+                                                [
+                                                    hp.quniform('h4', 24, 24 * 20, 24),
+                                                    0
+                                                ]),
+            'lr':                       hp.uniform('lr', 0.0001, 0.1),
+            }
+
+param = ho_sample(space)

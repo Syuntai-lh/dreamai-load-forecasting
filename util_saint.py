@@ -523,7 +523,7 @@ def light_gbm_learn_gen(trainAR, testAR, x_24hrs):
     avr_smape = np.mean(smape_list)
     return ypr, avr_smape
 
-def non_linear_model_gen(trainAR, testAR, params):
+def non_linear_model_gen_v1(trainAR, testAR, params):
     if params == None:
         params = {
             'EPOCH': 80,
@@ -535,8 +535,8 @@ def non_linear_model_gen(trainAR, testAR, params):
 
     numData = np.size(trainAR, 0)
     numTr = int(numData * 0.8)
-    Xtr = trainAR[0:numTr - 1, :]
-    Ytr = testAR[0:numTr - 1, :]
+    Xtr = trainAR[0:numTr, :]
+    Ytr = testAR[0:numTr, :]
 
     Xte = trainAR[numTr:numData, :]
     Yte = testAR[numTr:numData, :]
@@ -590,12 +590,21 @@ def non_linear_model_gen(trainAR, testAR, params):
 
     return model, avr_smape
 
+def non_linear_model_gen_v3(trainAR, testAR, params):
+    if params == None:
+        params = {
+            'EPOCH': 80,
+            'h1': 128,
+            'h2': 256,
+            'h3': 128,
+            'h4': 0,
+            'lr': 0.001,
+        }
 
-def lstm_gen(trainAR, testAR, EPOCHS):
     numData = np.size(trainAR, 0)
     numTr = int(numData * 0.8)
-    Xtr = trainAR[0:numTr - 1, :]
-    Ytr = testAR[0:numTr - 1, :]
+    Xtr = trainAR[0:numTr, :]
+    Ytr = testAR[0:numTr, :]
 
     Xte = trainAR[numTr:numData, :]
     Yte = testAR[numTr:numData, :]
@@ -603,26 +612,147 @@ def lstm_gen(trainAR, testAR, EPOCHS):
     num_tr = np.size(trainAR, 1)
     num_te = np.size(testAR, 1)
 
-    Xtr = Xtr.reshape(-1,num_tr,1)
+    # Build model
+    model = tf.keras.Sequential()
+    model.add(layers.Dense(params['h1'], activation='relu', input_shape=(num_tr,)))
+    model.add(layers.Dense(params['h2'], activation='relu'))
+    model.add(layers.Dense(params['h2'], activation='relu'))
+    model.add(layers.Dense(params['h1'], activation='relu'))
+    model.add(layers.Dense(num_te))
+
+    optimizer = tf.keras.optimizers.Adam(params['lr'])
+
+    model.compile(loss='mae',
+                  optimizer=optimizer,
+                  metrics=['mae', 'mse'])
+
+    #    model.summary()
+
+    # example_batch = Xtr[:10]
+    # example_result = model.predict(example_batch)
+    # example_result
+
+    class PrintDot(keras.callbacks.Callback):
+        def on_epoch_end(self, epoch, logs):
+            if epoch % 100 == 0: print('')
+
+    history = model.fit(
+        Xtr, Ytr,
+        epochs=params['EPOCH'], verbose=0,
+        callbacks=[PrintDot()])
+
+    hist = pd.DataFrame(history.history)
+    hist['epoch'] = history.epoch
+    hist.tail()
+
+    Ypr = model.predict(Xte)
+
+    smape_list = np.zeros((len(Ypr), 1))
+
+    for i in range(0, len(Ypr)):
+        smape_list[i] = smape(Ypr[i, :], Yte[i, :])
+    avr_smape = np.mean(smape_list)
+
+    return model, avr_smape
+
+def non_linear_model_gen_v2(trainAR, testAR, params):
+    if params == None:
+        params = {
+            'EPOCH': 80,
+            'h1': 128,
+            'h2': 256,
+            'h3': 128,
+            'h4': 0,
+            'lr': 0.001,
+        }
+
+    numData = np.size(trainAR, 0)
+    numTr = int(numData * 0.8)
+    Xtr = trainAR[0:numTr, :]
+    Ytr = testAR[0:numTr, :]
+
+    Xte = trainAR[numTr:numData, :]
+    Yte = testAR[numTr:numData, :]
+
+    num_tr = np.size(trainAR, 1)
+    num_te = np.size(testAR, 1)
+
+    # Build model
+    model = tf.keras.Sequential()
+    model.add(layers.Dense(params['h1'], activation='relu', input_shape=(num_tr,)))
+    model.add(layers.Dense(params['h2'], activation='relu'))
+    model.add(layers.Dense(params['h3'], activation='relu'))
+    model.add(layers.Dense(params['h4'], activation='relu'))
+    model.add(layers.Dense(num_te))
+
+    optimizer = tf.keras.optimizers.Adam(params['lr'])
+
+    model.compile(loss='mae',
+                  optimizer=optimizer,
+                  metrics=['mae', 'mse'])
+
+    #    model.summary()
+
+    # example_batch = Xtr[:10]
+    # example_result = model.predict(example_batch)
+    # example_result
+
+    class PrintDot(keras.callbacks.Callback):
+        def on_epoch_end(self, epoch, logs):
+            if epoch % 100 == 0: print('')
+
+    history = model.fit(
+        Xtr, Ytr,
+        epochs=params['EPOCH'], verbose=0,
+        callbacks=[PrintDot()])
+
+    hist = pd.DataFrame(history.history)
+    hist['epoch'] = history.epoch
+    hist.tail()
+
+    Ypr = model.predict(Xte)
+
+    smape_list = np.zeros((len(Ypr), 1))
+
+    for i in range(0, len(Ypr)):
+        smape_list[i] = smape(Ypr[i, :], Yte[i, :])
+    avr_smape = np.mean(smape_list)
+
+    return model, avr_smape
+
+
+def lstm_gen(trainAR, testAR, EPOCHS):
+    numData = np.size(trainAR, 0)
+    numTr = int(numData * 0.8)
+    Xtr = trainAR[0:numTr, :]
+    Ytr = testAR[0:numTr, :]
+
+    Xte = trainAR[numTr:numData, :]
+    Yte = testAR[numTr:numData, :]
+
+    num_tr = np.size(trainAR, 1)
+    num_te = np.size(testAR, 1)
+
+    Xtr = Xtr.reshape(-1, num_tr, 1)
     Xte = Xte.reshape(-1, num_te, 1)
-    Ytr = Ytr.reshape(-1,num_tr)
+    Ytr = Ytr.reshape(-1, num_tr)
     Yte = Yte.reshape(-1, num_te)
     train_data = tf.data.Dataset.from_tensor_slices((Xtr, Ytr))
     train_data = train_data.shuffle(num_tr, reshuffle_each_iteration=True)
     train_data = train_data.batch(num_tr)
     train_data = train_data.repeat(EPOCHS)
     val_data = tf.data.Dataset.from_tensor_slices((Xte, Yte))
-    # val_data = val_data.batch(10).repeat(10)
     val_data = val_data.batch(num_te)
 
     def build_model():
         model = tf.keras.Sequential([
-            tf.keras.layers.LSTM(24,
+            tf.keras.layers.LSTM(128,
                                  return_sequences=False,
                                  input_shape=Xtr.shape[-2:],
-                                  activation='relu'),
-            layers.Dense(num_te, activation='relu')
-
+                                 activation='relu'),
+            layers.Dense(256, activation='relu'),
+            layers.Dense(128, activation='relu'),
+            layers.Dense(num_te)
         ])
 
         optimizer = tf.keras.optimizers.Adam(0.001)
@@ -632,8 +762,8 @@ def lstm_gen(trainAR, testAR, EPOCHS):
                       metrics=['mae', 'mse'])
         return model
 
-
     model = build_model()
+
     es = EarlyStopping(
         monitor='val_loss',
         min_delta=0,
@@ -643,8 +773,9 @@ def lstm_gen(trainAR, testAR, EPOCHS):
         baseline=None,
         restore_best_weights=True
     )
+
     history = model.fit(
-        train_data,epochs=EPOCHS, verbose=1, validation_data=val_data,callback=[es])
+        train_data, epochs=EPOCHS, verbose=1, validation_data=val_data, callbacks=[es])
 
     hist = pd.DataFrame(history.history)
     hist['epoch'] = history.epoch
@@ -656,5 +787,4 @@ def lstm_gen(trainAR, testAR, EPOCHS):
     for i in range(0, len(Ypr)):
         smape_list[i] = smape(Ypr[i, :], Yte[i, :])
     avr_smape = np.mean(smape_list)
-
     return model, avr_smape

@@ -17,7 +17,6 @@ def load_obj(name):
 
 
 #%%
-
 test = pd.read_csv('data/test.csv')
 submission = pd.read_csv('submit/sub_baseline.csv')
 
@@ -38,9 +37,10 @@ for key_idx, key in tqdm(enumerate(test.columns)):
     trainAR, testAR, subm_24hrs, fchk = data_pr
 
     baseline_val_result = pd.read_csv('val_results/baseline_result.csv')
+    lstm_model, lstm_smape = lstm_gen(trainAR, testAR, EPOCHS=80)
 
-    # 튜닝 파라미터 load..
-    for method in ['dnn', 'dnn_2', 'svr', 'svr_2', 'dct', 'extra', 'rf']:
+    ### 튜닝 파라미터 load..
+    for method in ['dnn', 'dnn_2','dnn_3', 'svr', 'svr_2', 'dct', 'extra', 'rf']:
         my_file = Path(f"tune_results/{key_idx}_{method}.pkl")
         if my_file.exists():
             if tune_val_result == None:
@@ -54,19 +54,29 @@ for key_idx, key in tqdm(enumerate(test.columns)):
     # best만 남김
     tune_val_result = tune_val_result[0]
 
+    # 기존 방법보다 smape가 낮을 때 replace
     if tune_val_result['loss'] < baseline_val_result['min_smape'].values[key_idx]:
         prev_loss = baseline_val_result['min_smape'].values[key_idx]
         improved_loss = tune_val_result['loss']
         params = tune_val_result['params']
         method = tune_val_result['method']
         print(f'For {method}, prev loss: {prev_loss} now: {improved_loss}')
-
-        if method == 'dnn':
-            Non_NNmodel, non_smape = non_linear_model_gen(trainAR, testAR, params = params )
-            temp_24hrs = np.zeros([1, 24])
-            for qq in range(0, 24):
-                temp_24hrs[0, qq] = subm_24hrs[qq]
-            fcst = Non_NNmodel.predict(temp_24hrs)
+        if 'dnn' in method:
+            # 선택된 모델이 dnn일 시 앙상블
+            ens_results = []
+            for iter in range(5):
+                if method == 'dnn':
+                    Non_NNmodel, non_smape = non_linear_model_gen_v1(trainAR, testAR, params=params)
+                elif method == 'dnn_2':
+                    Non_NNmodel, non_smape = non_linear_model_gen_v2(trainAR, testAR, params=params)
+                elif method == 'dnn_3':
+                    Non_NNmodel, non_smape = non_linear_model_gen_v3(trainAR, testAR, params=params)
+                temp_24hrs = np.zeros([1, 24])
+                for qq in range(0, 24):
+                    temp_24hrs[0, qq] = subm_24hrs[qq]
+                fcst = Non_NNmodel.predict(temp_24hrs)
+                ens_results.append(fcst)
+            fcst = np.mean(ens_results, axis=0)
         elif method == 'svr':
             fcst, svr_smape = svr_gen(trainAR, testAR, subm_24hrs, params = params)
         elif method == 'rf':
@@ -75,9 +85,10 @@ for key_idx, key in tqdm(enumerate(test.columns)):
             fcst, dct_smape = dct_gen(trainAR, testAR, subm_24hrs, params = params)
         elif method == 'extra':
             fcst, extra_smape = extra_gen(trainAR, testAR, subm_24hrs, params = params)
-
         submission.loc[key, 0:24] = np.ravel(fcst)
+    else:
+        print('Using baseline model of '+baseline_val_result['selected_model'].values[key_idx])
 
 
 #%% save new result
-submission.to_csv('submit/submit_8.csv',index=True)
+submission.to_csv('submit/submit_11.csv',index=True)
