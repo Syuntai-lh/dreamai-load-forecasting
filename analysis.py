@@ -220,7 +220,7 @@ print('====')
 print(np.mean(smape_val))
 
 
-#%%
+#%% 이거 꼭 돌리기 !!
 def save_obj(obj, name):
     with open('tune_results/'+ name + '.pkl', 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
@@ -228,8 +228,26 @@ def save_obj(obj, name):
 for i in range(200):
     a_list = load_obj(str(i)+'_dnn_3')
     for j in range(len(a_list)):
-        a_list[j]['method'] = 'dnn_3'
+        a_list[j]['params']['h3'] = a_list[j]['params']['h2']
+        a_list[j]['params']['h4'] = a_list[j]['params']['h1']
+        a_list[j]['method'] = 'dnn'
     save_obj(a_list, str(i)+'_dnn_3')
+
+for i in range(200):
+    a_list = load_obj(str(i)+'_dnn_2')
+    for j in range(len(a_list)):
+        a_list[j]['params']['h4'] = int(a_list[j]['params']['h4'])
+        a_list[j]['method'] = 'dnn'
+    save_obj(a_list, str(i)+'_dnn_2')
+
+#%% confirm
+
+#%% combine all the results
+for i in range(200):
+    a_list = load_obj(str(i)+'_svr')
+    a_list = a_list[:10]
+    save_obj(a_list, str(i) + '_svr')
+
 
 #%%
 from hyperopt import fmin, hp, tpe, Trials, space_eval
@@ -258,3 +276,13 @@ space = {
             }
 
 param = ho_sample(space)
+
+#%% combine svr
+for i in range(200):
+    a_list = load_obj(str(i)+'_svr')
+    b_list = load_obj(str(i) + '_svr_2')
+    c_list = load_obj(str(i) + '_svr_3')
+    a_list += b_list
+    a_list += c_list
+    a_list = sorted(a_list, key=lambda k: k['loss'])
+    save_obj(a_list, str(i) + '_svr_comb')

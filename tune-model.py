@@ -89,6 +89,8 @@ class Tuning_model(object):
             'EPOCH':                    hp.quniform('EPOCH', 50, 200, 5),
             'h1':                       hp.quniform('h1', 24, 24*20, 24),
             'h2':                       hp.quniform('h2', 24, 24*20, 24),
+            'h3':                       hp.quniform('h3', 24, 24 * 20, 24),
+            'h4':                       hp.quniform('h4', 24, 24 * 20, 24),
             'lr':                       hp.loguniform('lr',np.log(1e-4),np.log(1e-1))
             }
 
@@ -133,9 +135,9 @@ class Tuning_model(object):
         return {'loss': smape, 'params': params, 'status': STATUS_OK, 'method':args.method}
 
     def dnn_val(self, params, train_set):
-        params = make_param_int(params, ['EPOCH', 'h1', 'h2'])
+        params = make_param_int(params, ['EPOCH', 'h1', 'h2','h3','h4'])
         trainAR, testAR = train_set
-        _, smape = non_linear_model_gen_v3(trainAR, testAR, params)
+        _, smape = non_linear_model_gen(trainAR, testAR, params)
         # Dictionary with information for evaluation
         return {'loss': smape, 'params': params, 'status': STATUS_OK, 'method':args.method}
 

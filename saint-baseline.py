@@ -115,7 +115,7 @@ for key in tqdm(test.columns):
         data_pr = pickle.load(f)
     trainAR, testAR, subm_24hrs, fchk = data_pr
     # DNN model
-    Non_NNmodel, non_smape = non_linear_model_gen(trainAR, testAR)
+    Non_NNmodel, non_smape = non_linear_model_gen_v1(trainAR, testAR)
 
     # random forest model
     mac_fcst, Mac_smape = machine_learn_gen(trainAR, testAR, subm_24hrs)

@@ -522,7 +522,7 @@ def light_gbm_learn_gen(trainAR, testAR, x_24hrs):
         ypr[h] = model.predict(x_24hrs)
     avr_smape = np.mean(smape_list)
     return ypr, avr_smape
-
+"""
 def non_linear_model_gen_v1(trainAR, testAR, params):
     if params == None:
         params = {
@@ -560,12 +560,6 @@ def non_linear_model_gen_v1(trainAR, testAR, params):
         return model
 
     model = build_model()
-
-    #    model.summary()
-
-    # example_batch = Xtr[:10]
-    # example_result = model.predict(example_batch)
-    # example_result
 
     class PrintDot(keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs):
@@ -654,8 +648,9 @@ def non_linear_model_gen_v3(trainAR, testAR, params):
     avr_smape = np.mean(smape_list)
 
     return model, avr_smape
-
-def non_linear_model_gen_v2(trainAR, testAR, params):
+"""
+def non_linear_model_gen(trainAR, testAR, params):
+    # default parameter
     if params == None:
         params = {
             'EPOCH': 80,
@@ -666,14 +661,13 @@ def non_linear_model_gen_v2(trainAR, testAR, params):
             'lr': 0.001,
         }
 
+    # load data
     numData = np.size(trainAR, 0)
     numTr = int(numData * 0.8)
     Xtr = trainAR[0:numTr, :]
     Ytr = testAR[0:numTr, :]
-
     Xte = trainAR[numTr:numData, :]
     Yte = testAR[numTr:numData, :]
-
     num_tr = np.size(trainAR, 1)
     num_te = np.size(testAR, 1)
 
@@ -682,38 +676,19 @@ def non_linear_model_gen_v2(trainAR, testAR, params):
     model.add(layers.Dense(params['h1'], activation='relu', input_shape=(num_tr,)))
     model.add(layers.Dense(params['h2'], activation='relu'))
     model.add(layers.Dense(params['h3'], activation='relu'))
-    model.add(layers.Dense(params['h4'], activation='relu'))
+    if params['h4'] != 0:
+        model.add(layers.Dense(params['h4'], activation='relu'))
     model.add(layers.Dense(num_te))
-
     optimizer = tf.keras.optimizers.Adam(params['lr'])
-
     model.compile(loss='mae',
                   optimizer=optimizer,
                   metrics=['mae', 'mse'])
 
-    #    model.summary()
+    history = model.fit(Xtr, Ytr,epochs=params['EPOCH'], verbose=0)
 
-    # example_batch = Xtr[:10]
-    # example_result = model.predict(example_batch)
-    # example_result
-
-    class PrintDot(keras.callbacks.Callback):
-        def on_epoch_end(self, epoch, logs):
-            if epoch % 100 == 0: print('')
-
-    history = model.fit(
-        Xtr, Ytr,
-        epochs=params['EPOCH'], verbose=0,
-        callbacks=[PrintDot()])
-
-    hist = pd.DataFrame(history.history)
-    hist['epoch'] = history.epoch
-    hist.tail()
-
+    # predict
     Ypr = model.predict(Xte)
-
     smape_list = np.zeros((len(Ypr), 1))
-
     for i in range(0, len(Ypr)):
         smape_list[i] = smape(Ypr[i, :], Yte[i, :])
     avr_smape = np.mean(smape_list)
