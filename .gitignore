@@ -1,5 +1,12 @@
-kn-baseline.py
-util_kn.py
+참고
 etc
 .idea
 __pycache__
+catboost_info
+data
+data_pr
+pred
+submit
+tmp
+tune_results_with_seed
+val_results
