@@ -1,5 +1,7 @@
-2020 꿈꾸는아이(AI) 경진대회
+2020 Dream AI Open Challenge
 =======================================
+homepage: [link](https://dreamai.kr/fair_open)
+
 ### __Structure__
 The structure of the project is as follows.
 ```setup
@@ -13,9 +15,9 @@ The structure of the project is as follows.
     └── hotel-self-prediction.py
     └── power-data-augmentation.py
 └── 발표자료
-    └── 1라운드 기술발표.pdf
-    └── 2라운드 배틀경쟁.pdf
-    └── 3라운드 BM경쟁.pdf
+    └── round1.pdf
+    └── round2.pdf
+    └── round3.pdf
 ```
 * main.ipynb: main file of the proposed load forecasting model
 * parameters: parameters used in main file
