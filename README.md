@@ -2,6 +2,12 @@
 =======================================
 homepage: [link](https://dreamai.kr/fair_open)
 
+### __Context__
+* [Introduction](#introduction)
+* [Proposed prediction model](#proposed-prediction-model)
+* [Proposed business model](#proposed-business-model)
+* [Prize](#prize)
+
 ### __Structure__
 The structure of the project is as follows.
 ```setup
@@ -24,12 +30,6 @@ The structure of the project is as follows.
 * gui: gui for business product
 * business-simulation: Virtual simulation to validate the effectiveness of the proposed business model
 * PPT: 1, 2, 3round presentation files
-
-### __Context__
-* [Introduction](#introduction)
-* [Proposed prediction model](#proposed-prediction-model)
-* [Proposed business model](#proposed-business-model)
-* [Prize](#prize)
 
 
 Introduction
