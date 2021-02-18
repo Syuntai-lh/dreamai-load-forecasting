@@ -14,7 +14,7 @@ The structure of the project is as follows.
     └── hotel-manipulation.py
     └── hotel-self-prediction.py
     └── power-data-augmentation.py
-└── 발표자료
+└── PPT
     └── round1.pdf
     └── round2.pdf
     └── round3.pdf
@@ -29,8 +29,7 @@ The structure of the project is as follows.
 * [Introduction](#introduction)
 * [Proposed prediction model](#proposed-prediction-model)
 * [Proposed business model](#proposed-business-model)
-* [Result](#result)
-
+* [Prize](#prize)
 
 
 Introduction
@@ -99,7 +98,15 @@ A draft solution to monitor and estimate property room demand
 * Output 1: Historical and Estimated Power Usage, Number of Guests
 * Output 2: Estimated income, etc. based on the estimated number of guests;
 
-Result
+Prize
 ==================
 * Round 1 (Technical solution): Private leaderboard: 1th
-* Round 2 (Technical solution + Business model): 3th
+* Round 2 (Technical solution + Business model): 3th 
+ 
+![gui](img/꿈아이.jpg)
+
+
+Contact
+==================
+If there is something wrong or you have any questions, send me an e-mail or make an issue.  
+[![Gmail Badge](https://img.shields.io/badge/-Gmail-d14836?style=flat-square&logo=Gmail&logoColor=white&link=mailto:pond9816@gmail.com)](mailto:pond9816@gmail.com)
